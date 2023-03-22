@@ -28,7 +28,7 @@ model = model.to("cuda")
 
 #%%
 # Load data (Garbage is already filtered in the MongoDB pipeline)
-path="data/processed_chatlogs/filian/*.cleaned.csv"
+path="../data/processed_chatlogs/filian/*.cleaned.csv"
 df = pd.concat([pd.read_csv(f, sep=',', index_col=0).reset_index(drop=True) for f in glob(path)]).reset_index(drop=True)
 # Remove duplicates
 df = df.drop_duplicates(subset=["message", "username"])

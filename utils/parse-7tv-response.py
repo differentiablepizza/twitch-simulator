@@ -1,12 +1,12 @@
 #%%
 import json
 import pymongo
+import requests
 
 # %%
-filename="/home/user/Downloads/7tv_filian_emotes.json"
+url="https://api.7tv.app/v2/users/filian/emotes"
 streamer = "filian"
-with open(filename) as file:
-    data = json.load(file)
+data = requests.get(url).json()
 # %%
 filtered = list(
     map(

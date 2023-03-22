@@ -1,12 +1,12 @@
 #%%
 import json
 import pymongo
+import requests
 
 # %%
-filename="/home/user/Downloads/ffz.json"
 streamer = "global"
-with open(filename) as file:
-    data = json.load(file)
+url="https://api.betterttv.net/3/cached/emotes/global"
+data = requests.get(url).json()
 # %%
 filtered = list(
     map(
