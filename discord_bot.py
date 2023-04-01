@@ -30,46 +30,71 @@ logger.addHandler(handler)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-#%%
-#Get latest model
+# Load the latest model and tokenizer during initialization
 models = glob("models/gpt_neo_chatbot_v*")
 model_name = max(models, key=os.path.getctime)
 model = GPTNeoForCausalLM.from_pretrained(model_name).to(device)
 tokenizer = GPT2Tokenizer.from_pretrained("EleutherAI/gpt-neo-125M")
 tokenizer.add_special_tokens({'pad_token': '[PAD]'})
-# %%
 
-#%%
 def prompt(messages):
-    # If the messase is from the bot, prepend "STREAMER: ", otherwise "CHAT: "
-    # The messages come in reverse, the earliest ones are the first ones.
-    prompt = []
-    char_count = 0
-    for message in messages:
-        if message.author == client.user:
-            prompt.append(f"STREAMER: {message.content}")
-        else:
-            prompt.append(f"CHAT: {message.content}\n")
-        #Check is mesage is more than 500 characters
-        char_count += len(message.content)
-        if len(prompt) > 500:
-            break
-    prompt.reverse()
+    """
+    Generate a response to the given list of messages using the loaded GPT-Neo model.
+
+    Args:
+        messages: A list of Message objects from a Discord channel.
+
+    Returns:
+        A string containing the generated response.
+    """
+    # Construct the prompt as a list of strings
+    query = messages[0].content
+    messages = reversed(messages)
+    prompt = [f"STREAMER: {message.content}" if message.author == client.user else f"CHAT: {message.content}\n" for message in messages]
+    # Limit prompt to maximum of 500 characters
+    prompt = prompt[:500]
+    # Append the streamer prompt to the end of the list
     prompt.append("STREAMER: ")
+    # Join the prompt list using a newline separator
     prompt = "\n".join(prompt)
-    logger.debug(f"Input:\n{prompt}")
+    logger.debug(f"Prompt:\n{prompt}")
+    
+    # Encode the prompt as input_ids and attention_mask tensors
     input_ids = tokenizer.encode(prompt, return_tensors="pt")
     attention_mask = (input_ids != tokenizer.pad_token_id).to(device)
     input_ids = input_ids.to(device)
-    output = model.generate(input_ids, attention_mask = attention_mask, max_length=1000, do_sample=True, top_k=5, top_p=0.95, temperature=0.9)
-    message = tokenizer.decode(output[0], skip_special_tokens=True)
-    logger.debug(f"Output:\n{message}")
-    #Extracting last response with "STREAMER:" prefix
-    message = message.split("\n")
-    message = [line for line in message if line.startswith("STREAMER:")][-1]
-    message=re.sub("STREAMER: ","",message)
-    message=message.strip().strip("\"").strip("\n")
+    
+    # Generate a response using the loaded GPT-Neo model
+    output = model.generate(input_ids, attention_mask=attention_mask, max_length=200, do_sample=True, top_k=5, top_p=0.95, temperature=0.9)
+    message = tokenizer.decode(output[0], skip_special_tokens=True).replace("\"","")
+    organized_message = []
+    logger.debug(f"Preview:\n{message}")
+    ix = 0
+    query_ix = None
+    for line in message.split("\n"):
+        if line.startswith("STREAMER:"):
+            organized_message.append(("STREAMER", line.replace("STREAMER:", "")))
+            ix += 1
+        elif line.startswith("CHAT:"):
+            if query in line:
+                organized_message.append(("QUERY", line.replace("CHAT:", "")))
+                query_ix = ix
+            else:
+                organized_message.append(("CHAT", line.replace("CHAT:", "")))
+                ix += 1
+        else:
+            organized_message[-1] = (organized_message[-1][0], organized_message[-1][1] + " " + line)
+    
+    # Filter only the streamer's response after the query
+    logger.debug(f"{query=}\t{query_ix=}")
+    message = [line[1].strip().strip("\n").strip("\"") for line in organized_message[query_ix:] if line[0] == "STREAMER"]
+    logger.debug(f"Response:\n{message}")
+
+    # Return the response
+    message = "\n".join(message)
+    
     return message
+
     
 
 #%%
@@ -83,27 +108,43 @@ intents.messages = True
 # Create a new client with the Intents object
 client = discord.Client(intents=intents)
 
-#%%
 @client.event
 async def on_ready():
+    """
+    Function that gets called when the bot connects to Discord.
+    """
     print("Ready")
+
+
 @client.event
 async def on_message(message):
+    """
+    Function that gets called every time a message is sent in a server or direct message.
+    """
     # Ignore messages sent by the bot itself
     if message.author == client.user:
         return
-    
+
+    # Define a variable to store the bot's response
     response = ""
+
     if message.content.startswith("!reset"):
-        response = prompt([])
-        logger.debug(f"Resetting history")
+        await message.channel.send("IGNORE")
+
     else:
+        # If the message doesn't start with !reset, get the 10 most recent messages in the channel or DM
         history = []
         async for message in message.channel.history(limit=10):
-            history.append(message)
-        #Drop commands
+            if message.content != "IGNORE":
+                history.append(message)
+            else:
+                break
+
+        # Remove any messages that start with !
         history = [message for message in history if not message.content.startswith("!")]
         logger.debug(f"History:\n{history}")
+
+        # Get a response based on the history of messages
         response = prompt(history)
 
     # Check if the message mentions the bot

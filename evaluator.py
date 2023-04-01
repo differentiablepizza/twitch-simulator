@@ -2,10 +2,12 @@
 from transformers import GPT2Tokenizer
 from transformers.models.gpt_neo import GPTNeoForCausalLM
 import re
+import os
+from glob import glob
 
 #%%
-# Set up model and tokenizer
-model_name = "models/gpt_neo_chatbot_v6"
+# Set up teokenizer and get last model with name "models/gpt_neo_chatbot_v?"
+model_name = max(glob("models/gpt_neo_chatbot_v*"), key=os.path.getctime)
 tokenizer_name = "EleutherAI/gpt-neo-125M"
 tokenizer = GPT2Tokenizer.from_pretrained(tokenizer_name)
 model = GPTNeoForCausalLM.from_pretrained(model_name)

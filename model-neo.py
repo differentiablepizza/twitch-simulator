@@ -111,14 +111,3 @@ model.push_to_hub(f"twitch-simulator-filian-neo-{suffix}", commit_message="Add m
 # Check if a model is already saved with name "gpt_neo_chatbot_vj", where j is the version number. If so, save the model with the next version number.
 trainer.save_model(f"models/gpt_neo_chatbot_v{len(glob('models/gpt_neo_chatbot_v*'))}")
 tokenizer.save_pretrained(f"tokenizers/gpt_neo_chatbot_v{len(glob('tokenizers/gpt_neo_chatbot_v*'))}")
-
-#%%
-# Generate text
-prompt = """
-STREAMER: I am a
-"""
-input_ids = tokenizer.encode(prompt, return_tensors="pt").to("cuda")
-output = model.generate(input_ids, max_length=100, do_sample=True, top_k=50, top_p=0.95, temperature=0.7)
-print(tokenizer.decode(output[0], skip_special_tokens=True))
-
-# %%
