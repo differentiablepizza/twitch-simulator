@@ -28,11 +28,13 @@ model = model.to("cuda")
 
 #%%
 # Load data (Garbage is already filtered in the MongoDB pipeline)
-path="../data/processed_chatlogs/filian/*.cleaned.csv"
+path="../data/processed_chatlogs/filian/all-in-2023-04-01.csv"
 df = pd.concat([pd.read_csv(f, sep=',', index_col=0).reset_index(drop=True) for f in glob(path)]).reset_index(drop=True)
 # Remove duplicates
 df = df.drop_duplicates(subset=["message", "username"])
 df["username"] = df["username"].apply(lambda x: "STREAMER" if (x == "[STREAMER]") else ("STREAM TITLE" if (x=="[STREAM TITLE]") else "CHAT"))
+# Drop \n
+df["message"] = df["message"].str.replace("\n", " ")
 
 #%%
 df.head()
@@ -113,8 +115,7 @@ tokenizer.save_pretrained(f"tokenizers/gpt_neo_chatbot_v{len(glob('tokenizers/gp
 #%%
 # Generate text
 prompt = """
-CHAT: KEKW Filian is cringe
-STREAMER: Today we will
+STREAMER: I am a
 """
 input_ids = tokenizer.encode(prompt, return_tensors="pt").to("cuda")
 output = model.generate(input_ids, max_length=100, do_sample=True, top_k=50, top_p=0.95, temperature=0.7)
